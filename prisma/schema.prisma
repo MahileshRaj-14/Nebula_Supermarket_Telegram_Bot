@@ -1,0 +1,94 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Product {
+  id           String     @id @default(uuid())
+  sku          String     @unique
+  name         String
+  category     String
+  unit         String     // e.g. "packet", "kg", "piece", "liter"
+  isPackaged   Boolean    @default(true)
+  costPrice    Float
+  sellPrice    Float
+  mrp          Float
+  gstRate      Float      // e.g. 0, 5, 12, 18
+  hsnCode      String
+  quantity     Float      // stock quantity
+  reorderLevel Float      // threshold for low-stock warning
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+  billItems    BillItem[]
+}
+
+model Customer {
+  id                String            @id @default(uuid())
+  name              String
+  phone             String?
+  balance           Float             @default(0) // Positive means customer owes store money
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+  bills             Bill[]
+  khataTransactions KhataTransaction[]
+}
+
+model Bill {
+  id               String     @id @default(uuid())
+  billNumber       String     @unique
+  telegramUserId   String?    // Session owner
+  customerId       String?
+  customer         Customer?  @relation(fields: [customerId], references: [id])
+  status           String     @default("DRAFT") // DRAFT, FINALIZED, CANCELLED
+  subtotal         Float      @default(0)
+  gstAmount        Float      @default(0)
+  total            Float      @default(0)
+  paymentMode      String?    // CASH, UPI, CARD, CREDIT
+  paymentReference String?
+  createdAt        DateTime   @default(now())
+  finalizedAt      DateTime?
+  items            BillItem[]
+}
+
+model BillItem {
+  id        String   @id @default(uuid())
+  billId    String
+  bill      Bill     @relation(fields: [billId], references: [id], onDelete: Cascade)
+  productId String
+  product   Product  @relation(fields: [productId], references: [id])
+  quantity  Float
+  unitPrice Float
+  gstRate   Float
+  gstAmount Float
+  lineTotal Float
+}
+
+model KhataTransaction {
+  id         String   @id @default(uuid())
+  customerId String
+  customer   Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  type       String   // CREDIT_GIVEN, PAYMENT_RECEIVED
+  amount     Float
+  reference  String?
+  createdAt  DateTime @default(now())
+}
+
+model Preference {
+  id             String   @id @default(uuid())
+  telegramUserId String
+  key            String
+  value          String
+  updatedAt      DateTime @updatedAt
+
+  @@unique([telegramUserId, key])
+}
+
+model ProcessedUpdate {
+  id               String   @id @default(uuid())
+  telegramUpdateId String   @unique
+  processedAt      DateTime @default(now())
+}

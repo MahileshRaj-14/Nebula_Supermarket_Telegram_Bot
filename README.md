@@ -5,6 +5,8 @@ An AI-powered conversational supermarket and kirana-store operations manager tha
 **Telegram Bot**: `@mahilesh_supermarket_ops_bot`
 
 ---
+## SAMPLE SCREENSHOTS OF FEW IMPLEMENTATION (All the features are added this is just for sample)
+<img width="722" height="1600" alt="image" src="https://github.com/user-attachments/assets/4e03cbdc-ce3f-4c67-a9df-9d1877262d50" />
 
 ## 1. Project Overview
 

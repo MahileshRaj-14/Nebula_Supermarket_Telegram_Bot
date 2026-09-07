@@ -1,19 +1,24 @@
-# Supermarket Ops Agent 🛒🤖
+# Supermarket Ops Agent 
 
-An AI-powered conversational supermarket and kirana-store operations manager that operates entirely through **Telegram**. "The chat is the product."
+An AI-powered conversational supermarket and kirana-store operations manager that operates entirely through **Telegram**. *"The chat is the product."*
+
+**Telegram Bot**: `@mahilesh_supermarket_ops_bot`
+
+---
 
 ## 1. Project Overview
 
 Supermarket Ops Agent allows shop owners to naturally manage store inventory, multi-item billing drafts, customer Khata credit ledgers, sales analytics, and generate professional PDF tax invoices and PowerPoint performance decks directly within Telegram chat.
 
-### Key Capabilities
+### Key Features
 - **Natural Language Interaction**: Speak naturally to inquire about stock, bill items, check balances, or record payments.
-- **Transactional Oversell Protection**: Atomic database transactions prevent negative inventory.
-- **Deterministic GST System**: GST rates (0%, 5%, 12%, 18%) and CGST/SGST splits are calculated in TypeScript code using integer paise arithmetic (no LLM hallucination).
+- **AI Agent ToolLoop Harness**: Built with Vercel AI SDK (`ai` + `@ai-sdk/groq`) using `openai/gpt-oss-120b` for deterministic, autonomous tool calling.
+- **Transactional Oversell Protection**: Atomic database transactions (`prisma.$transaction`) prevent negative inventory.
+- **Deterministic GST System**: GST rates (0%, 5%, 12%, 18%) and CGST/SGST splits are calculated in TypeScript code using integer paise arithmetic (no LLM calculation hallucination).
 - **Khata Credit Ledger**: Manage customer credit balances, record repayments, and view statement history.
 - **Document Generation**: Instant delivery of PDF Tax Invoices (PDFKit) and 6-slide PowerPoint Sales Analysis decks (PptxGenJS).
 - **Persistent Preferences**: Store settings (e.g. payment preferences, shop name) that survive `/new` session resets.
-- **Update Idempotency**: Prevents duplicate Telegram update processing.
+- **Update Idempotency**: Prevents duplicate Telegram update processing via `ProcessedUpdate` middleware.
 
 ---
 
@@ -26,15 +31,15 @@ Supermarket Ops Agent allows shop owners to naturally manage store inventory, mu
       ↓
 ProcessedUpdate (Idempotency Middleware)
       ↓
-  ToolLoopAgent (Vercel AI SDK / OpenAI)
+ToolLoopAgent (Vercel AI SDK / Groq - openai/gpt-oss-120b)
       ↓
   Agent Tools (Zod Validated)
-  ├── Inventory
-  ├── Billing
-  ├── Khata / Credit
-  ├── Analytics
-  ├── Documents (PDF & PPTX)
-  └── Preferences
+  ├── Inventory (search_products, get_product, add_product, receive_stock, get_low_stock)
+  ├── Billing (add_item_to_bill, remove_item_from_bill, get_draft_bill, finalize_bill)
+  ├── Khata / Credit (add_credit, record_credit_payment, get_credit_balance)
+  ├── Analytics (get_daily_sales, get_weekly_sales)
+  ├── Documents (generate_invoice_pdf, generate_analysis_pptx)
+  └── Preferences (set_preference, get_preference)
       ↓
 Business Logic Services (Deterministic Rules & GST)
       ↓
@@ -45,35 +50,35 @@ SQLite File Database (dev.db) / PostgreSQL
 
 ---
 
-## 3. Agent Loop & Harness
+## 3. Agent Harness & Control Loop
 
-### Why Vercel AI SDK (`ToolLoopAgent`)?
-We use Vercel AI SDK's `generateText` with `maxSteps: 10`. Rather than using a complex state-machine or hardcoded intent router, the agent operates in an autonomous control loop:
+### Why Vercel AI SDK & Groq?
+The agent uses Vercel AI SDK's `generateText` with `@ai-sdk/groq` using the `openai/gpt-oss-120b` model. Rather than using a rigid state machine or regex router, the agent operates in an autonomous control loop:
 
-1. **OBSERVE**: Read incoming natural language message from Telegram.
-2. **REASON**: Determine required tool calls based on Zod input schemas and tool descriptions.
+1. **OBSERVE**: Receive natural language input from Telegram.
+2. **REASON**: Select appropriate tools based on Zod parameters and descriptions.
 3. **ACT**: Execute deterministic business logic services via tools.
-4. **RECEIVE TOOL RESULT**: Inspect tool output (e.g. stock level, draft bill update, error message).
-5. **REASON AGAIN**: Determine if additional steps (or document generation) are needed.
-6. **RESPOND**: Send structured, friendly natural language response and deliver any generated files via Telegram.
+4. **RECEIVE TOOL RESULT**: Inspect tool output (e.g. database stock, draft bill summary, error message).
+5. **REASON AGAIN**: Determine if additional tool steps or document generations are needed.
+6. **RESPOND**: Send structured, friendly natural language response and deliver any generated files (PDF/PPTX) via Telegram.
 
 ---
 
 ## 4. Database & Storage Strategy
 
-- **ORM**: Prisma ORM with strongly typed schema.
-- **Standalone Local Storage**: SQLite (`file:./dev.db`) is configured so the project runs immediately without requiring an external database server connection.
-- **PostgreSQL Production Ready**: To switch to PostgreSQL for production deployment, simply update `provider = "postgresql"` in `prisma/schema.prisma` and provide `DATABASE_URL`.
+- **ORM**: Prisma ORM with strongly typed schemas (`Product`, `Customer`, `Bill`, `BillItem`, `KhataTransaction`, `Preference`, `ProcessedUpdate`).
+- **Standalone Local Storage**: SQLite (`file:./dev.db`) is configured out of the box so the application runs standalone with zero external database setup required.
+- **PostgreSQL Production Ready**: To switch to PostgreSQL for production deployment, simply set `provider = "postgresql"` in `prisma/schema.prisma` and provide `DATABASE_URL`.
 
 ---
 
 ## 5. Business Rules & Guardrails
 
 ### Oversell Protection
-All billing finalization runs inside a database transaction (`prisma.$transaction`):
+All billing finalization runs inside an atomic database transaction (`prisma.$transaction`):
 1. Lock and verify draft bill items.
 2. Check `product.quantity >= requestedQuantity` for every line item.
-3. Reject transaction with error if stock is insufficient.
+3. Reject transaction with a clear error if stock is insufficient.
 4. Decrement stock atomically only upon finalization.
 
 ### GST Calculation
@@ -81,10 +86,10 @@ Intra-state GST rules are enforced deterministically:
 - `taxableValuePaise = Math.round(quantity * unitPrice * 100)`
 - `gstAmountPaise = Math.round(taxableValuePaise * (gstRate / 100))`
 - `cgst = gstAmount / 2`, `sgst = gstAmount / 2`
-- Internal calculations use integer paise to prevent floating-point rounding errors.
+- Internal calculations use integer paise arithmetic to avoid floating-point rounding errors.
 
 ### Idempotency
-`ProcessedUpdate` table stores processed Telegram `update_id`s. Duplicate updates redelivered by Telegram are recognized and ignored cleanly.
+`ProcessedUpdate` model tracks processed Telegram `update_id`s. Duplicate updates redelivered by Telegram are recognized and skipped cleanly.
 
 ---
 
@@ -99,15 +104,15 @@ Intra-state GST rules are enforced deterministically:
    npm install
    ```
 
-2. **Environment Variables**:
-   Copy `.env.example` to `.env` and fill in your keys:
+2. **Configure Environment Variables**:
+   Create a `.env` file (refer to `.env.example`):
    ```env
    DATABASE_URL="file:./dev.db"
-   OPENAI_API_KEY="your-openai-api-key"
-   TELEGRAM_BOT_TOKEN="your-telegram-bot-token"
+   GROQ_API_KEY="gsk_..."
+   TELEGRAM_BOT_TOKEN="8916796971:AAG_..."
    ```
 
-3. **Database Migration & Seed**:
+3. **Database Setup & Seeding**:
    ```bash
    npm run db:push
    npm run db:seed
@@ -125,29 +130,30 @@ Intra-state GST rules are enforced deterministically:
 
 ---
 
-## 7. Demo Commands Flow
+## 7. Demonstration Flow
 
-| Step | User Prompt Example | Action |
-|------|--------------------|--------|
-| 1. Stock Receiving | *"Add 20 packets of Maggi."* | Replenishes stock via `receive_stock`. |
-| 2. Multi-item Bill | *"Bill 2 Atta and 3 Maggi for Ravi."* | Creates draft bill with items. |
-| 3. Bill Editing | *"Actually remove one Maggi."* | Updates draft bill quantity. |
-| 4. Oversell Test | *"Add 500 Maggi."* | Rejects transaction due to insufficient stock. |
-| 5. Finalize Bill | *"Finalize with UPI."* | Executes transactional finalization & stock decrement. |
-| 6. PDF Invoice | *"Send me the invoice."* | Generates and uploads PDF Tax Invoice. |
-| 7. Khata Credit | *"Give Ravi ₹300 worth of groceries on credit."* | Adds credit transaction to Khata ledger. |
-| 8. Khata Payment | *"Ravi paid ₹100."* | Records payment and updates balance. |
-| 9. Analytics | *"Give me today's sales report."* | Fetches daily sales summary. |
-| 10. PPTX Deck | *"Create the sales analysis deck."* | Generates and uploads 6-slide PowerPoint presentation. |
-| 11. Preference Memory | *"Remember that I prefer UPI."* | Saves preference in database. |
-| 12. Reset Session | `/new` | Resets draft session while keeping saved preferences. |
+| Step | User Prompt Example | Agent Action & Tool Called |
+|------|--------------------|---------------------------|
+| 1. Stock Check | *"How much Maggi do we have?"* | Calls `get_product` / `search_products`. Returns database stock. |
+| 2. Receive Stock | *"Add 20 packets of Maggi."* | Calls `receive_stock`. Replenishes inventory in DB. |
+| 3. Multi-item Bill | *"Bill 2 Atta and 3 Maggi for Ravi."* | Calls `add_item_to_bill`. Creates active draft bill. |
+| 4. Bill Editing | *"Actually remove one Maggi."* | Calls `remove_item_from_bill`. Updates draft quantities. |
+| 5. Oversell Protection | *"Add 500 Maggi."* | Rejects transaction with insufficient stock message. |
+| 6. Finalize Bill | *"Finalize with UPI."* | Calls `finalize_bill`. Executes `$transaction` & stock decrement. |
+| 7. PDF Tax Invoice | *"Send me the invoice."* | Calls `generate_invoice_pdf`. Uploads PDF document to Telegram. |
+| 8. Khata Credit | *"Give Ravi ₹300 worth of groceries on credit."* | Calls `add_credit`. Records credit entry in Khata ledger. |
+| 9. Credit Payment | *"Ravi paid ₹100."* | Calls `record_credit_payment`. Updates customer balance. |
+| 10. Daily Analytics | *"Give me today's sales report."* | Calls `get_daily_sales`. Returns sales & tax summary. |
+| 11. PPTX Deck | *"Create the sales analysis deck."* | Calls `generate_analysis_pptx`. Uploads 6-slide PPTX deck to Telegram. |
+| 12. Preference Memory | *"Remember that I prefer UPI."* | Calls `set_preference`. Persists preference in DB. |
+| 13. Reset Session | `/new` | Resets draft bill session while keeping saved preferences. |
 
 ---
 
 ## 8. Deployment
 
-To deploy to Railway or Render:
-1. Connect GitHub repository.
-2. Set environment variables (`DATABASE_URL`, `OPENAI_API_KEY`, `TELEGRAM_BOT_TOKEN`).
-3. Build Command: `npm run build && npm run db:push`
-4. Start Command: `npm start`
+To deploy to Railway, Render, or any Node.js container:
+1. Connect repository.
+2. Set environment variables (`DATABASE_URL`, `GROQ_API_KEY`, `TELEGRAM_BOT_TOKEN`).
+3. Build command: `npm run build && npm run db:push`
+4. Start command: `npm start`

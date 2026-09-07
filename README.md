@@ -6,8 +6,8 @@ An AI-powered conversational supermarket and kirana-store operations manager tha
 
 ---
 ## SAMPLE SCREENSHOTS OF FEW IMPLEMENTATION (All the features are added this is just for sample)
-<img width="1599" height="1599" alt="image" src="https://github.com/user-attachments/assets/be24aebf-c902-4cd5-8666-48d79edb7021" />
 <img width="1599" height="1599" alt="image" src="https://github.com/user-attachments/assets/f8fe01df-a547-46fb-9e9e-d109b0176c0c" />
+<img width="1599" height="1599" alt="image" src="https://github.com/user-attachments/assets/be24aebf-c902-4cd5-8666-48d79edb7021" />
 
 ## 1. Project Overview
 
